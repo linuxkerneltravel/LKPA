@@ -20,6 +20,7 @@ struct sched_class {
 };
 ```
 ![classes](./images/scheduling-classes.png)
+
 故而如若要比较调度类描述符之间的优先级只能通过 :
 ```
 void check_preempt_curr(struct rq *rq, struct task_struct *p, int flags)
@@ -584,6 +585,7 @@ Key to Flags:
 其实到这里,第一个 `patch` 的内容差不多已经完成了,**但是通过 `patch` 中大佬的讨论获取信息,重要性或许不次于 `patch` 修改了什么内容**(而且主线版本的提交会采纳这些意见进行修改)。
 #### `Rasmus Villemoes` 对 `patch` 的评价
 ![reply](./images/reply.png)
+
 蓝色的 `Rasmus Villemoes` 表示回复这个 `patch` 的用户。
 每行 `>` 开头的表示引用,也就是要回复的内容,正常的黑色字体就是回复的内容了。
 `I think it would make the code simpler if one reverses these, see other

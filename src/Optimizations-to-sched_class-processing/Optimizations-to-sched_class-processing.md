@@ -1,13 +1,13 @@
 # 对内核补丁 [sched: Optimizations to sched_class processing](https://lore.kernel.org/patchwork/cover/1170901/) 详解
 -------
-## <center>`Patch`组简要说明</center>
+## <center>简要说明</center>
 ![head](./images/head.png)
 
 当前处于 : `[RFC,0/4] sched: Optimizations to sched_class processing`
 这里概述这组补丁做了什么,后续四篇每篇表示一次有序的 `patch`。
 
 -------
-## <center>`Patch`组概述</center>
+## <center>概述</center>
 在进程调度子系统中, `check_preempt_curr`需要根据调度类描述符的优先级比较判断某任务是否可以抢占当前就绪队列运行的任务,但由于各个调度类描述符(`stop_sched_class`就是一个调度类描述符)以链表的数据格式连接,且链表中元素由高优先级调度类描述符到低优先级调度类描述符,结构如下所示 :
 ```
 struct sched_class {
@@ -52,6 +52,7 @@ void check_preempt_curr(struct rq *rq, struct task_struct *p, int flags)
 
 -------
 ## <center>[RFC,0/4] sched: Optimizations to sched_class processing</center>
+### Message
 ```
 As Kirill made a micro-optimization to the processing of pick_next_task()
 that required the address locations of the sched_class descriptors to
@@ -104,7 +105,7 @@ Steven Rostedt (VMware) (3):
 ```
 交代一下把 `Kirill Tkhai` 的 `patch` 放在哪,两人各自提交的 `patch`, 以及四次 `patch` 的变更。
 
-#### `[RFC,0/4]`概述总结
+##### `[RFC,0/4]`概述总结
 通过对链接脚本进行修改,将原依赖 `next` 字段组织的调度类描述符改为数组的数据形式,需要注意的是在**该`patch`修改之后其实数组和链表的形式同时存在(每次只改一点,避免大概引入太多BUG难以定位,逻辑上也更清晰一些),但无论是单链表还是数组,调度类描述符的优先级都需要在顺序上进行体现**。
 调度类描述符优先级如下 :
 ```
@@ -115,6 +116,8 @@ dl_sched_class < stop_sched_class
 
 -------
 ## [RFC,1/4] sched: Force the address order of each sched class descriptor
+
+### Commit Message
 ```
 In order to make a micro optimization in pick_next_task(), the order of the
 sched class descriptor address must be in the same order as their priority
@@ -143,6 +146,8 @@ Signed-off-by: Steven Rostedt (VMware) <rostedt@goodmis.org>
  &dl_sched_class < &stop_sched_class
 ```
 为了保证`sched class`描述符的这个顺序，将每个类都添加到它们自己的数据部分中，并在链接器脚本中强制执行这个顺序。
+
+### Patch
 ```
 diff --git a/include/asm-generic/vmlinux.lds.h b/include/asm-generic/vmlinux.lds.h
 index e00f41aa8ec4..772d961c69a5 100644
@@ -411,7 +416,7 @@ index 4c9e9975684f..03bc7530ff75 100644
  	.enqueue_task		= enqueue_task_stop,
 ```
 这里是对五个调度类描述符的定义进行修改, 在调度类描述符名后面添加字段 `__attribute__((section("__xx_sched_class")))` 来将这个声明为当前文件生成的目标文件的一个 `section`。这样才能使用链接脚本在链接时作为`input section` 操控链接过程。`__xx_sched_class` 是 `section name`。
-#### 链接脚本样例
+##### 链接脚本样例
 使用 `ld --verbose | sed '$d' | sed '1,13d' > s.lds` 指令导出默认链接脚本如下为 `s.lds` 文件。
 
 **定制脚本 `main.lds`, 差异如下 :**
@@ -583,7 +588,9 @@ Key to Flags:
 可以看到 `node2` 和 `node1` 的地址差值变为了 32。显然在 `section` 前添加 `. = ALIGN(32);` 仅可以将后**一个 `section`** 对齐(这关系到该 `patch` 组 `[RFC,3/4]` 的一个 `bug`, 后续会提及)。
 
 其实到这里,第一个 `patch` 的内容差不多已经完成了,**但是通过 `patch` 中大佬的讨论获取信息,重要性或许不次于 `patch` 修改了什么内容**(而且主线版本的提交会采纳这些意见进行修改)。
-#### `Rasmus Villemoes` 对 `patch` 的评价
+
+### Comments
+##### `Rasmus Villemoes` 对 `patch` 的评价
 ![reply](./images/reply.png)
 
 蓝色的 `Rasmus Villemoes` 表示回复这个 `patch` 的用户。
@@ -605,7 +612,7 @@ reply.`
 .rodata?`
 他认为不应该把结构体数组放在 `DATA_DATA` 内(如上),因为这个是可写的(会被链接到 `.data` 中),应该把这个链接到 `.rodata` (后续采纳了这个意见)。
 
-#### 下一篇是 `Peter Zijlstra` 回复 `Rasmus Villemoes`
+##### 下一篇是 `Peter Zijlstra` 回复 `Rasmus Villemoes`
 ```
 On Fri, Dec 20, 2019 at 09:52:37AM +0100, Rasmus Villemoes wrote:
 > On 19/12/2019 22.44, Steven Rostedt wrote:
@@ -700,7 +707,7 @@ Right! That wants fixing.
 ```
 对于 `Rasmus Villemoes` 的回复, `Peter Zijlstra` 非常认同。
 
-#### 下一篇是 `Rasmus Villemoes` 回复 `Peter Zijlstra`
+##### 下一篇是 `Rasmus Villemoes` 回复 `Peter Zijlstra`
 ```
 On 20/12/2019 11.00, Peter Zijlstra wrote:
 > On Fri, Dec 20, 2019 at 09:52:37AM +0100, Rasmus Villemoes wrote:
@@ -765,7 +772,7 @@ needing some ifdeffery to define highest_sched_class if they are laid
 out in (higher sched class <-> higher address) order.
 ```
 `Rasmus Villemoes` 认同 `Peter Zijlstra` 的观点(`STOP_SCHED_CLASS` 定义的太混乱了)。但是他认为如若删除 `STOP_SCHED_CLASS` 并不能避免需要 `ifdeffery` (或许是 `#ifdef` 的意思)去定义 `highest_sched_class`。
-#### 下一篇是 `Kirill Tkhai` 回复 `Rasmus Villemoes`
+##### 下一篇是 `Kirill Tkhai` 回复 `Rasmus Villemoes`
 ```
 On 20.12.2019 13:12, Rasmus Villemoes wrote:
 > On 20/12/2019 11.00, Peter Zijlstra wrote:
@@ -820,7 +827,7 @@ My opinion is to better make some less beautiful thing in a single synchronous p
 than to distribute the redundancy over all the code (especially, when it is asynchronous).
 ```
 `Kirill Tkhai` 认为不应该引入 `helper`,因为如若过了很久,在很多地方都使用了 `helper`,为了考虑兼容性,可能会在 `helper` 加入一些不可避免的冗余,而这些冗余会造成可读性的减弱。
-#### 下一篇是 `Peter Zijlstra` 回复 `Rasmus Villemoes`
+##### 下一篇是 `Peter Zijlstra` 回复 `Rasmus Villemoes`
 ```
 On Fri, Dec 20, 2019 at 11:12:37AM +0100, Rasmus Villemoes wrote:
 > On 20/12/2019 11.00, Peter Zijlstra wrote:
@@ -878,7 +885,7 @@ __end_sched_classes points to one past __dl_sched_class, no?
 `When no __stop_sched_class is present, that section is 0 sized, and
 __end_sched_classes points to one past __dl_sched_class, no?`
 这句话回复了之前的所有疑问。现在没有 `__stop_sched_class` 的话, 这个 `section` 就大小为 0 ,并且 `__end_sched_classes` 的指针指向 `__dl_sched_class`。
-#### 下一篇是 `Rasmus Villemoes` 回复 `Peter Zijlstra`
+##### 下一篇是 `Rasmus Villemoes` 回复 `Peter Zijlstra`
 ```
 On 20/12/2019 13.19, Peter Zijlstra wrote:
 > On Fri, Dec 20, 2019 at 11:12:37AM +0100, Rasmus Villemoes wrote:
@@ -961,7 +968,7 @@ Rasmus
 
 他认为还有一种办法是在 `sched/core.c` 直接将 `fair_sched_class` 作为 `&sched_classes[1]` (其实就是定义一个普通数组,而不采用链接脚本的方式来做),这样的话编译器也可以明白这个遍历。但是不希望遍历五次所以还是像上面一样实现好了。
 
-#### 最后一篇是 `Steven Rostedt` 回复 `Kirill Tkhai`
+##### 最后一篇是 `Steven Rostedt` 回复 `Kirill Tkhai`
 ```
 On Fri, 20 Dec 2019 13:44:05 +0300
 Kirill Tkhai <ktkhai@virtuozzo.com> wrote:
@@ -979,6 +986,8 @@ one locality.
 
 -------
 ## <center>[RFC,2/4] sched: Have sched_class_highest define by vmlinux.lds.h</center>
+
+### Commit Message
 ```
 From: "Steven Rostedt (VMware)" <rostedt@goodmis.org>
 
@@ -997,6 +1006,8 @@ Signed-off-by: Steven Rostedt (VMware) <rostedt@goodmis.org>
  2 files changed, 13 insertions(+), 7 deletions(-)
 ```
 现在,各个调度类描述符已经由链接器脚本定义，并且需要知道是否启用`SMP`时`stop_sched_class`是否存在，因为在定义`SMP`时，它被用作最高优先级。将`sched_class_highest`的声明移动到插入`stop_sched_class`的链接器脚本中的相同位置，这也将使查看被定义为最高级调度类的内容变得更容易，正如这个链接器脚本定义的优先级一样。
+
+### Patch
 ```
 diff --git a/include/asm-generic/vmlinux.lds.h b/include/asm-generic/vmlinux.lds.h
 index 772d961c69a5..1c14c4ddf785 100644
@@ -1099,7 +1110,8 @@ index 280a3c735935..0554c588ad85 100644
 ```
 上述是对于 `kernel/sched/sched.h` 的修改。可以看到把 `sched_class_highest` 移动到 `include/asm-generic/vmlinux.lds.h` 文件里去了,  `sched_class_highest` 从 `struct sched_class *` 变为了 `struct sched_class`, 并采用  `extern struct sched_class sched_class_highest;` 来声明。
 
-#### 下一篇是 `Rasmus Villemoes` 对该 `patch` 的评价
+### Comments
+##### 下一篇是 `Rasmus Villemoes` 对该 `patch` 的评价
 ```
 If you reverse the ordering so the highest sched class comes first, this
 can just be
@@ -1154,6 +1166,7 @@ stop_task.c also has a #ifdef CONFIG_SMP).
 
 -------
 ## <center>[RFC,3/4] sched: Remove struct sched_class next field</center>
+### Commit Message
 ```
 From: "Steven Rostedt (VMware)" <rostedt@goodmis.org>
 
@@ -1174,6 +1187,8 @@ Signed-off-by: Steven Rostedt (VMware) <rostedt@goodmis.org>
  7 files changed, 4 insertions(+), 8 deletions(-)
 ```
 既然通过链接器脚本vmlinux.ld.h按顺序定义了sched_class描述符,就没有理由使用指向前一个优先级结构的`"next"`指针。结构的顺序可以作为数组对齐，并用于索引和查找下一个`sched_class`描述符。
+
+### Patch
 ```
 diff --git a/include/asm-generic/vmlinux.lds.h b/include/asm-generic/vmlinux.lds.h
 index 1c14c4ddf785..f4d480c4f7c6 100644
@@ -1280,6 +1295,7 @@ index 0554c588ad85..30a4615cf480 100644
  extern const struct sched_class dl_sched_class;
 ```
 删除 `struct sched_class` 的 `next` 字段,修改自定义边界的遍历与所有调度类描述符遍历的方法。
+### Comments
 ### `Rasmus Villemoes` 对 `patch` 的评论
 ```
 
@@ -1328,6 +1344,7 @@ sched_class[]" array.
 
 -------
 ## <center>[RFC,4/4] sched: Micro optimization in pick_next_task() and in check_preempt_curr()</center>
+### Commit Message
 ```
 From: Kirill Tkhai <tkhai@yandex.ru>
 
@@ -1355,6 +1372,8 @@ Signed-off-by: Steven Rostedt (VMware) <rostedt@goodmis.org>
  1 file changed, 9 insertions(+), 15 deletions(-)
 ```
 可以不通过迭代比较优先级大小,且在完成修改后生成 `kernel/sched/core.o` 文件变小了(虽然只是小的优化,但对于精益求精的内核而言,也是一个重要的点)
+
+### Patch
 ```
 diff --git a/kernel/sched/core.c b/kernel/sched/core.c
 index 90e4b00ace89..63401807fcf0 100644
@@ -1414,15 +1433,15 @@ index 90e4b00ace89..63401807fcf0 100644
 
 -------
 ## <center>主线分支所有修改与该`patch`组之间的差异</center>
-#### 拉取项目
+##### 拉取项目
 ```
 git clone https://gitee.com/mirrors/linux.git
 ```
 在工作目录下拉取Linux主线分支代码,推荐使用 gitee 可能会更快。
-#### patch文件下载与放置
+##### patch文件下载与放置
 点击[链接](https://lore.kernel.org/patchwork/cover/1170901/)在右上角`series`点击下载`sched-Optimizations-to-sched_class-processing.patch`文件,该文件是`patch`组修改汇总,可以使用`git am`指令应用`.patch`文件,将修改提交到分支上。
 将下载好的`sched-Optimizations-to-sched_class-processing.patch`文件放置到工作目录下。
-#### 主线分支 `Optimizations-to-sched_class-processing`
+##### 主线分支 `Optimizations-to-sched_class-processing`
 ```
 cd linux
 git checkout -b Optimizations-to-sched_class-processing
@@ -1432,7 +1451,7 @@ git checkout -b Optimizations-to-sched_class-processing
 git reset aa93cd53bc1b91b5f99c7b55e3dcc1ac98e99558 --hard
 ```
 将分支`Optimizations-to-sched_class-processing`硬重置到主线中该`patch`组最后一次修改后的提交上。
-#### 添加原始`patch`组修改
+##### 添加原始`patch`组修改
 ```
 git checkout -b origin-patch-op 
 ```

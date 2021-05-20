@@ -416,7 +416,7 @@ index 4c9e9975684f..03bc7530ff75 100644
  	.enqueue_task		= enqueue_task_stop,
 ```
 这里是对五个调度类描述符的定义进行修改, 在调度类描述符名后面添加字段 `__attribute__((section("__xx_sched_class")))` 来将这个声明为当前文件生成的目标文件的一个 `section`。这样才能使用链接脚本在链接时作为`input section` 操控链接过程。`__xx_sched_class` 是 `section name`。
-
+更多关于`lds`的学习请点击[lds案例教程](../../examples/lds/lds.md)
 
 其实到这里,第一个 `patch` 的内容差不多已经完成了,**但是通过 `patch` 中大佬的讨论获取信息,重要性或许不次于 `patch` 修改了什么内容**(而且主线版本的提交会采纳这些意见进行修改)。
 

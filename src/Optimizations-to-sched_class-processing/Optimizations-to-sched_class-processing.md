@@ -4,7 +4,10 @@
 ![head](./images/head.png)
 
 当前处于 : `[RFC,0/4] sched: Optimizations to sched_class processing`
-这里概述这组补丁做了什么,后续四篇每篇表示一次有序的 `patch`。
+`RFC`全称`Request For Change/Comment`,表示这不是正式要去提交到mainline上的代码,只是用来说明方向,查看意见的,因此对这类的代码要求较低,作者也可以基于后续的意见再进行改进。
+`0/4`表示是概述,且后续有四篇有序的 `patch`。
+红色正框内的`mbox`点击会下载一份`.mbox`文件,内容即是`Message`。
+红色圆框内的`series`点击会下载一份`.patch`文件,内容包含这组`patch`的所有改动。
 
 -------
 ## <center>概述</center>

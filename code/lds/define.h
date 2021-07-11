@@ -1,0 +1,3 @@
+struct node{
+        int size;
+};
